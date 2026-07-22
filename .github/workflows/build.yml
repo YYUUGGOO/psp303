@@ -157,6 +157,7 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
           VERSION: ${{ steps.package.outputs.version }}
           ARCHIVE: ${{ steps.package.outputs.archive }}
         run: |
