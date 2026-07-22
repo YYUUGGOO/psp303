@@ -1,0 +1,109 @@
+name: Build PSP-303
+
+on:
+  push:
+    branches:
+      - master
+      - main
+  pull_request:
+    branches:
+      - master
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  BUILD_TYPE: Release
+
+jobs:
+  test:
+    name: Host sync tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Compile and run libpspsync tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          cc \
+            -std=c11 \
+            -Wall \
+            -Wextra \
+            -Werror \
+            -Ilibpspsync/include \
+            libpspsync/src/pspsync.c \
+            libpspsync/tests/test_pspsync.c \
+            -o /tmp/test_pspsync
+          /tmp/test_pspsync
+
+  build:
+    name: PSPSDK release build
+    needs: test
+    runs-on: ubuntu-latest
+    container:
+      image: pspdev/pspdev:v20260601
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Verify bundled USB MIDI artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s psp-usb-midi/dist/PspUsbMidi/PspUsbMidiConfig.cmake
+          test -s psp-usb-midi/dist/PspUsbMidi/include/psp_usb_midi.h
+          test -s psp-usb-midi/dist/PspUsbMidi/lib/libPspUsbMidi.a
+          test -s psp-usb-midi/dist/PspUsbMidi/kernel/UsbMidiDriver.prx
+
+      - name: Configure PSP build
+        shell: bash
+        run: |
+          set -euo pipefail
+          psp-cmake \
+            -S . \
+            -B build \
+            -DCMAKE_BUILD_TYPE="${BUILD_TYPE}"
+
+      - name: Build EBOOT
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmake --build build --parallel
+
+      - name: Verify deployable files
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s build/EBOOT.PBP
+          test -s build/UsbMidiDriver.prx
+          cmp \
+            build/UsbMidiDriver.prx \
+            psp-usb-midi/dist/PspUsbMidi/kernel/UsbMidiDriver.prx
+
+      - name: Assemble Memory Stick package
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifact/PSP303
+          cp build/EBOOT.PBP artifact/PSP303/EBOOT.PBP
+          cp build/UsbMidiDriver.prx artifact/PSP303/UsbMidiDriver.prx
+          cp README.md artifact/PSP303/README.md
+          cd artifact
+          sha256sum \
+            PSP303/EBOOT.PBP \
+            PSP303/UsbMidiDriver.prx \
+            > SHA256SUMS.txt
+
+      - name: Upload PSP-303 package
+        uses: actions/upload-artifact@v4
+        with:
+          name: PSP303-${{ github.sha }}
+          path: artifact/
+          if-no-files-found: error
+          retention-days: 30
