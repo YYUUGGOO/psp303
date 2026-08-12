@@ -123,30 +123,57 @@ jobs:
           cp build/EBOOT.PBP artifact/PSP303/EBOOT.PBP
           cp build/UsbMidiDriver.prx artifact/PSP303/UsbMidiDriver.prx
           cp README.md artifact/PSP303/README.md
-          cd artifact
+
+      - name: Upload PSP-303 build files
+        uses: actions/upload-artifact@v4
+        with:
+          name: PSP303-build-files-${{ github.sha }}
+          path: artifact/
+          if-no-files-found: error
+          retention-days: 1
+
+  package:
+    name: Package PSP-303 release
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download PSP-303 build files
+        uses: actions/download-artifact@v4
+        with:
+          name: PSP303-build-files-${{ github.sha }}
+          path: package-input
+
+      - name: Create PSP-303 zip
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s package-input/PSP303/EBOOT.PBP
+          test -s package-input/PSP303/UsbMidiDriver.prx
           sha256sum \
-            PSP303/EBOOT.PBP \
-            PSP303/UsbMidiDriver.prx \
-            > SHA256SUMS.txt
-          zip -9 -r \
-            "PSP-303-${GITHUB_SHA}.zip" \
-            PSP303 SHA256SUMS.txt
-          test -s "PSP-303-${GITHUB_SHA}.zip"
+            package-input/PSP303/EBOOT.PBP \
+            package-input/PSP303/UsbMidiDriver.prx \
+            > package-input/SHA256SUMS.txt
+          (
+            cd package-input
+            zip -9 -r \
+              "PSP-303-${GITHUB_SHA}.zip" \
+              PSP303 SHA256SUMS.txt
+          )
+          test -s "package-input/PSP-303-${GITHUB_SHA}.zip"
 
       - name: Upload PSP-303 package
         uses: actions/upload-artifact@v4
         with:
           name: PSP303-${{ github.sha }}
-          path: artifact/PSP-303-${{ github.sha }}.zip
+          path: package-input/PSP-303-${{ github.sha }}.zip
           if-no-files-found: error
           retention-days: 30
 
   release:
     name: Publish GitHub release
     if: startsWith(github.ref, 'refs/tags/v')
-    needs:
-      - test
-      - build
+    needs: package
     runs-on: ubuntu-latest
     permissions:
       contents: write
