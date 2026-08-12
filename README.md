@@ -37,6 +37,10 @@ test. Run it with `cmake -S . -B build-host-tests -DPSP303_BUILD_HOST_TESTS=ON`.
 The PSP job remains separate and checks the EBOOT, bundled driver, and assembled
 package files.
 
+Each push and pull request publishes the PSP zip as a workflow artifact. A tag
+such as `v1.0.2` publishes it to GitHub Releases; a manual workflow run can do
+the same by providing `release_version`.
+
 ## Implementation surface and limitations
 
 Pattern slots are stored as versioned, checksum-protected files under

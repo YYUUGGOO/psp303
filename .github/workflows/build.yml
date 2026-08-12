@@ -12,6 +12,11 @@ on:
       - master
       - main
   workflow_dispatch:
+    inputs:
+      release_version:
+        description: "Optional SemVer release to publish, for example v1.0.2"
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -172,7 +177,9 @@ jobs:
 
   release:
     name: Publish GitHub release
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: >-
+      startsWith(github.ref, 'refs/tags/v') ||
+      (github.event_name == 'workflow_dispatch' && inputs.release_version != '')
     needs: package
     runs-on: ubuntu-latest
     permissions:
@@ -188,9 +195,11 @@ jobs:
       - name: Validate version and prepare release archive
         id: package
         shell: bash
+        env:
+          VERSION_INPUT: ${{ inputs.release_version }}
         run: |
           set -euo pipefail
-          version="${GITHUB_REF_NAME}"
+          version="${VERSION_INPUT:-${GITHUB_REF_NAME}}"
           semver='^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$'
           if [[ ! "${version}" =~ ${semver} ]]; then
             echo "Tag must use SemVer, for example v1.2.0 or v1.2.0-rc.1" >&2
@@ -220,10 +229,14 @@ jobs:
         run: |
           set -euo pipefail
           release_flags=(
-            --verify-tag
             --generate-notes
             --title "PSP-303 ${VERSION}"
           )
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            release_flags+=(--target "${GITHUB_SHA}")
+          else
+            release_flags+=(--verify-tag)
+          fi
           if [[ "${VERSION}" == *-* ]]; then
             release_flags+=(--prerelease)
           fi
