@@ -90,12 +90,6 @@ Position Pointer is parsed by the portable MIDI layer. The current PSP UI still
 does not expose every model field (for example scale selection or individual
 delay subdivision labels); those APIs are host-tested and safe to extend.
 
-CI does not exercise a physical PSP, USB host, Volca, or Pocket Operator. USB
-enumeration, driver loading on hardware, analog pulse levels, cable routing, and
-long-run external-device phase therefore still require device testing. If the
-USB driver cannot initialize, the UI reports the PSP result and the internal
-synth remains usable.
-
 ## USB MIDI output
 
 PSP-303 automatically presents itself as a class-compliant USB MIDI device.
@@ -206,9 +200,6 @@ right channel to a mixer or audio interface.
 
 Enabled steps are filled; `A` marks accent and `S` marks slide.
 
-## License status
+## Acknowledgement
 
-This repository does not currently declare a root-project license in its source
-or documentation, so no license has been inferred or added. The bundled
-`psp-usb-midi` notices and source remain unchanged. A project owner should add
-the intended root license before redistribution.
+Coding Agents were used to identify and debug issues in parts of this code. Suggested changes were reviewed and verified before including them in the project.
