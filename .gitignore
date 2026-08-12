@@ -1,2 +1,5 @@
 build/
+build-host-tests/
+build-debug/
+build-release/
 .DS_Store

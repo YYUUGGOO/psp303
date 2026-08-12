@@ -2,18 +2,32 @@ cmake_minimum_required(VERSION 3.11)
 
 project(psp303)
 
+option(PSP303_BUILD_HOST_TESTS "Build portable host tests" OFF)
+
+if(PSP303_BUILD_HOST_TESTS)
+    include(CTest)
+    add_subdirectory(tests)
+    return()
+endif()
+
 add_subdirectory(libpspsync)
 include("${CMAKE_CURRENT_SOURCE_DIR}/psp-usb-midi/dist/PspUsbMidi/PspUsbMidiConfig.cmake")
 
 add_executable(${PROJECT_NAME}
     main.c
     midi_output.c
+    midi.c
+    pattern.c
+    randomizer.c
+    storage.c
+    transport.c
 )
 
 target_link_libraries(${PROJECT_NAME} PRIVATE
     pspdebug
     pspdisplay
     pspge
+    pspgu
     pspctrl
     pspaudio
     pspaudiolib

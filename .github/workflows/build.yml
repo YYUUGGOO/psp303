@@ -28,6 +28,33 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
+      - name: Build and run portable CMake tests when available
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -f tests/CMakeLists.txt ]]; then
+            cmake \
+              -S tests \
+              -B build-host-tests \
+              -DCMAKE_BUILD_TYPE="${BUILD_TYPE}"
+            cmake --build build-host-tests --parallel
+            ctest \
+              --test-dir build-host-tests \
+              --output-on-failure
+          elif [[ -f CMakeLists.txt ]] \
+              && grep -Eq '(^|[[:space:]])(enable_testing|add_test)[[:space:]]*\(' CMakeLists.txt; then
+            cmake \
+              -S . \
+              -B build-host-tests \
+              -DCMAKE_BUILD_TYPE="${BUILD_TYPE}"
+            cmake --build build-host-tests --parallel
+            ctest \
+              --test-dir build-host-tests \
+              --output-on-failure
+          else
+            echo "No host CMake test project or root test target; using the portable source test below."
+          fi
+
       - name: Compile and run libpspsync tests
         shell: bash
         run: |

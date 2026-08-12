@@ -186,6 +186,14 @@ static int write_note_off(uint8_t channel_status, uint8_t note, uint32_t timesta
     return UsbMidi_Write(&event, 1);
 }
 
+static int write_all_notes_off(uint8_t channel_status, uint32_t timestamp_us)
+{
+    UsbMidiEvent event;
+
+    set_event(&event, timestamp_us, (uint8_t)(0xB0U | channel_status), 123U, 0U);
+    return UsbMidi_Write(&event, 1);
+}
+
 static int publish_snapshot(
     int running,
     int last_result,
@@ -246,7 +254,7 @@ static int midi_thread(SceSize args, void *argp)
             g_midi.command = MIDI_COMMAND_NONE;
             if (command == MIDI_COMMAND_START) {
                 if (running == 0 && UsbMidi_IsConnected()) {
-                    UsbMidiEvent events[2];
+                    UsbMidiEvent events[3];
                     uint32_t now_us = sceKernelGetSystemTimeLow();
                     int count = 1;
 
@@ -279,7 +287,7 @@ static int midi_thread(SceSize args, void *argp)
                 }
             } else if (command == MIDI_COMMAND_STOP) {
                 if (running != 0 && UsbMidi_IsConnected()) {
-                    UsbMidiEvent events[2];
+                    UsbMidiEvent events[3];
                     uint32_t now_us = sceKernelGetSystemTimeLow();
                     int count = 0;
 
@@ -291,13 +299,15 @@ static int midi_thread(SceSize args, void *argp)
                             active_note,
                             0U);
                     }
+                    set_event(&events[count++], now_us,
+                              (uint8_t)(0xB0U | (channel - 1U)), 123U, 0U);
                     set_event(&events[count++], now_us, 0xFCU, 0U, 0U);
                     last_result = UsbMidi_Write(events, count);
                 } else {
                     last_result = 0;
                 }
                 running = 0;
-                note_active = 0U;
+                if (last_result == 0) note_active = 0U;
             } else if (command == MIDI_COMMAND_SET_BPM) {
                 bpm = g_midi.requested_bpm;
                 if (running != 0) {
@@ -334,8 +344,18 @@ static int midi_thread(SceSize args, void *argp)
                 sequence = g_midi.requested_sequence;
                 last_result = 0;
             } else if (command == MIDI_COMMAND_EXIT) {
+                if (UsbMidi_IsConnected()) {
+                    uint32_t now_us = sceKernelGetSystemTimeLow();
+                    if (note_active != 0U) {
+                        last_result = write_note_off((uint8_t)(channel - 1U),
+                                                     active_note, now_us);
+                    }
+                    if (last_result == 0) {
+                        last_result = write_all_notes_off((uint8_t)(channel - 1U), now_us);
+                    }
+                }
                 running = 0;
-                note_active = 0U;
+                if (last_result == 0) note_active = 0U;
                 last_result = 0;
             } else {
                 last_result = PSP_ERROR_AS_INT(SCE_KERNEL_ERROR_ILLEGAL_ARGUMENT);
@@ -382,14 +402,12 @@ static int midi_thread(SceSize args, void *argp)
             }
             if (last_result < 0) {
                 running = 0;
-                note_active = 0U;
             }
             (void)publish_snapshot(
                 running, last_result, bpm, ticks_sent,
                 schedule.dropped_ticks, step, channel, notes_enabled);
         } else if (wait_result < 0) {
             running = 0;
-            note_active = 0U;
             last_result = wait_result;
             (void)publish_snapshot(
                 running, last_result, bpm, ticks_sent,
