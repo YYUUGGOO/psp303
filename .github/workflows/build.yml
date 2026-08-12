@@ -128,12 +128,16 @@ jobs:
             PSP303/EBOOT.PBP \
             PSP303/UsbMidiDriver.prx \
             > SHA256SUMS.txt
+          zip -9 -r \
+            "PSP-303-${GITHUB_SHA}.zip" \
+            PSP303 SHA256SUMS.txt
+          test -s "PSP-303-${GITHUB_SHA}.zip"
 
       - name: Upload PSP-303 package
         uses: actions/upload-artifact@v4
         with:
           name: PSP303-${{ github.sha }}
-          path: artifact/
+          path: artifact/PSP-303-${{ github.sha }}.zip
           if-no-files-found: error
           retention-days: 30
 
@@ -154,7 +158,7 @@ jobs:
           name: PSP303-${{ github.sha }}
           path: release-input
 
-      - name: Validate version and create release archive
+      - name: Validate version and prepare release archive
         id: package
         shell: bash
         run: |
@@ -167,11 +171,10 @@ jobs:
           fi
 
           archive="PSP-303-${version}.zip"
+          source_archive="release-input/PSP-303-${GITHUB_SHA}.zip"
+          test -s "${source_archive}"
           mkdir -p release
-          (
-            cd release-input
-            zip -9 -r "../release/${archive}" PSP303 SHA256SUMS.txt
-          )
+          cp "${source_archive}" "release/${archive}"
           (
             cd release
             sha256sum "${archive}" > "${archive}.sha256"
